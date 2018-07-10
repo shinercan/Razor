@@ -1,3 +1,4 @@
+
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
@@ -112,6 +113,7 @@ namespace Microsoft.AspNetCore.Razor.Language.Legacy
             var baselineFileName = Path.ChangeExtension(FileName, ".syntaxtree.txt");
             var baselineDiagnosticsFileName = Path.ChangeExtension(FileName, ".diagnostics.txt");
             var baselineClassifiedSpansFileName = Path.ChangeExtension(FileName, ".classifiedspans.txt");
+            var baselineTagHelperSpansFileName = Path.ChangeExtension(FileName, ".taghelperspans.txt");
 
             if (GenerateBaselines)
             {
@@ -134,6 +136,18 @@ namespace Microsoft.AspNetCore.Razor.Language.Legacy
                 // Write classified spans baseline
                 var classifiedSpansBaselineFullPath = Path.Combine(TestProjectRoot, baselineClassifiedSpansFileName);
                 File.WriteAllText(classifiedSpansBaselineFullPath, ClassifiedSpanSerializer.Serialize(root, filePath));
+
+                // Write tag helper spans baseline
+                var tagHelperSpansBaselineFullPath = Path.Combine(TestProjectRoot, baselineTagHelperSpansFileName);
+                var serializedTagHelperSpans = TagHelperSpanSerializer.Serialize(root, filePath);
+                if (!string.IsNullOrEmpty(serializedTagHelperSpans))
+                {
+                    File.WriteAllText(tagHelperSpansBaselineFullPath, serializedTagHelperSpans);
+                }
+                else if (File.Exists(tagHelperSpansBaselineFullPath))
+                {
+                    File.Delete(tagHelperSpansBaselineFullPath);
+                }
 
                 return;
             }
@@ -166,8 +180,15 @@ namespace Microsoft.AspNetCore.Razor.Language.Legacy
                 throw new XunitException($"The resource {baselineClassifiedSpansFileName} was not found.");
             }
 
-            var classifiedSpanBaseline = classifiedSpanFile.ReadAllText().Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            ClassifiedSpanVerifier.Verify(root, filePath, classifiedSpanBaseline);
+            // Verify tag helper spans
+            var tagHelperSpanFile = TestFile.Create(baselineTagHelperSpansFileName, GetType().GetTypeInfo().Assembly);
+            var tagHelperSpanBaseline = new string[0];
+            if (tagHelperSpanFile.Exists())
+            {
+                tagHelperSpanBaseline = tagHelperSpanFile.ReadAllText().Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            }
+
+            TagHelperSpanVerifier.Verify(root, filePath, tagHelperSpanBaseline);
         }
 
         private static string SerializeDiagnostic(RazorDiagnostic diagnostic)

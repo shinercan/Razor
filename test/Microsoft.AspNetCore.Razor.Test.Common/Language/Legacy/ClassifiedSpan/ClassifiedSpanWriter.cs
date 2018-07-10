@@ -1,6 +1,7 @@
 ﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -20,7 +21,11 @@ namespace Microsoft.AspNetCore.Razor.Language.Legacy
 
         public virtual void Visit(SyntaxTreeNode node)
         {
-            var classifiedSpans = GetClassifiedSpans(node, _filePath);
+            if (!(node is Block block))
+            {
+                return;
+            }
+            var classifiedSpans = GetClassifiedSpans(block, _filePath);
             foreach (var span in classifiedSpans)
             {
                 VisitClassifiedSpan(span);
@@ -55,33 +60,16 @@ namespace Microsoft.AspNetCore.Razor.Language.Legacy
             _writer.Write(value);
         }
 
-        internal static IReadOnlyList<ClassifiedSpanInternal> GetClassifiedSpans(SyntaxTreeNode root, string filePath)
+        internal static IReadOnlyList<ClassifiedSpanInternal> GetClassifiedSpans(Block root, string filePath)
         {
-            var spans = Flatten(root);
+            // We don't care about the options and diagnostic here.
+            var syntaxTree = RazorSyntaxTree.Create(
+                root,
+                TestRazorSourceDocument.Create(filePath: filePath),
+                Array.Empty<RazorDiagnostic>(),
+                RazorParserOptions.CreateDefault());
 
-            var result = new ClassifiedSpanInternal[spans.Count];
-            for (var i = 0; i < spans.Count; i++)
-            {
-                var span = spans[i];
-                result[i] = new ClassifiedSpanInternal(
-                    new SourceSpan(
-                        span.Start.FilePath ?? filePath,
-                        span.Start.AbsoluteIndex,
-                        span.Start.LineIndex,
-                        span.Start.CharacterIndex,
-                        span.Length),
-                    new SourceSpan(
-                        span.Parent.Start.FilePath ?? filePath,
-                        span.Parent.Start.AbsoluteIndex,
-                        span.Parent.Start.LineIndex,
-                        span.Parent.Start.CharacterIndex,
-                        span.Parent.Length),
-                    span.Kind,
-                    span.Parent.Type,
-                    span.EditHandler.AcceptedCharacters);
-            }
-
-            return result;
+            return syntaxTree.GetClassifiedSpans();
         }
 
         private static List<Span> Flatten(SyntaxTreeNode root)
