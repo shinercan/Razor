@@ -638,20 +638,8 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
             return builder.ToString();
         }
 
-        private static string GetPropertyAccessor(DefaultTagHelperPropertyIntermediateNode node)
-        {
-            var propertyAccessor = $"{node.FieldName}.{node.PropertyName}";
-
-            if (node.IsIndexerNameMatch)
-            {
-                var dictionaryKey = node.AttributeName.Substring(node.BoundAttribute.IndexerNamePrefix.Length);
-                propertyAccessor += $"[\"{dictionaryKey}\"]";
-            }
-
-            return propertyAccessor;
-        }
-
-        private static string GetDeterministicId(CodeRenderingContext context)
+        // Internal for testing
+        internal static string GetDeterministicId(CodeRenderingContext context)
         {
             // Use the file checksum along with the absolute position in the generated code to create a unique id for each tag helper call site.
             var checksumBytes = context.SourceDocument.GetChecksum();
@@ -665,13 +653,29 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
             var combinedBytes = checksumBytes.Concat(absoluteIndexBytes).ToArray();
 
             // Use MD5 to create a 16 byte hash that can be parsed by Guid.
-            var combinedHash = Checksum.BytesToString(MD5.Create().ComputeHash(combinedBytes));
+            using (var md5 = MD5.Create())
+            {
+                var combinedHash = md5.ComputeHash(combinedBytes);
 
-            // Make sure Guid can parse the hash.
-            // Note: We don't want to pass the byte[] directly because we don't want the Guid constructor to swap the bytes.
-            var uniqueId = new Guid(combinedHash).ToString("N");
+                // Make sure Guid can parse the hash.
+                // Note: We don't want to pass the byte[] directly because we don't want the Guid constructor to swap the bytes.
+                var uniqueId = new Guid(Checksum.BytesToString(combinedHash)).ToString("N");
 
-            return uniqueId;
+                return uniqueId;
+            }
+        }
+
+        private static string GetPropertyAccessor(DefaultTagHelperPropertyIntermediateNode node)
+        {
+            var propertyAccessor = $"{node.FieldName}.{node.PropertyName}";
+
+            if (node.IsIndexerNameMatch)
+            {
+                var dictionaryKey = node.AttributeName.Substring(node.BoundAttribute.IndexerNamePrefix.Length);
+                propertyAccessor += $"[\"{dictionaryKey}\"]";
+            }
+
+            return propertyAccessor;
         }
     }
 }
