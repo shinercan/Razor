@@ -642,27 +642,10 @@ namespace Microsoft.AspNetCore.Razor.Language.Extensions
         internal static string GetDeterministicId(CodeRenderingContext context)
         {
             // Use the file checksum along with the absolute position in the generated code to create a unique id for each tag helper call site.
-            var checksumBytes = context.SourceDocument.GetChecksum();
-            var absoluteIndexBytes = BitConverter.GetBytes(context.CodeWriter.Location.AbsoluteIndex);
-            if (BitConverter.IsLittleEndian)
-            {
-                // We want to represent int using big endian notation.
-                // Rfc1014#section-3.1
-                Array.Reverse(absoluteIndexBytes);
-            }
-            var combinedBytes = checksumBytes.Concat(absoluteIndexBytes).ToArray();
+            var checksum = Checksum.BytesToString(context.SourceDocument.GetChecksum());
+            var uniqueId = checksum + context.CodeWriter.Location.AbsoluteIndex;
 
-            // Use MD5 to create a 16 byte hash that can be parsed by Guid.
-            using (var md5 = MD5.Create())
-            {
-                var combinedHash = md5.ComputeHash(combinedBytes);
-
-                // Make sure Guid can parse the hash.
-                // Note: We don't want to pass the byte[] directly because we don't want the Guid constructor to swap the bytes.
-                var uniqueId = new Guid(Checksum.BytesToString(combinedHash)).ToString("N");
-
-                return uniqueId;
-            }
+            return uniqueId;
         }
 
         private static string GetPropertyAccessor(DefaultTagHelperPropertyIntermediateNode node)
